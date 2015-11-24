@@ -19,14 +19,14 @@ if ($storage_hash['volumes_ceph'] or
 }
 
 if $use_ceph and $storage_hash['objects_ceph'] {
-  $ceph_primary_monitor_node = hiera('ceph_primary_monitor_node')
-  $primary_mons              = keys($ceph_primary_monitor_node)
-  $primary_mon               = $ceph_primary_monitor_node[$primary_mons[0]]['name']
+#   $ceph_primary_monitor_node = hiera('ceph_primary_monitor_node')
+#   $primary_mons              = keys($ceph_primary_monitor_node)
+#   $primary_mon               = $ceph_primary_monitor_node[$primary_mons[0]]['name']
 
   prepare_network_config(hiera_hash('network_scheme'))
   $ceph_cluster_network = get_network_role_property('ceph/replication', 'network')
   $ceph_public_network  = get_network_role_property('ceph/public', 'network')
-  $rgw_ip_address       = get_network_role_property('ceph/radosgw', 'ipaddr')
+  $rgw_ip_address       = get_netwouserrk_role_property('ceph/radosgw', 'ipaddr')
 
   # Apache and listen ports
   class { 'osnailyfacter::apache':
@@ -64,19 +64,22 @@ if $use_ceph and $storage_hash['objects_ceph'] {
     public_ssl                       => $public_ssl_hash['services'],
 
     # Ceph
-    primary_mon                      => $primary_mon,
+#     primary_mon                      => $primary_mon,
     pub_ip                           => $public_vip,
     adm_ip                           => $management_vip,
     int_ip                           => $management_vip,
 
     # RadosGW settings
-    rgw_host                         => $::hostname,
+#     rgw_host                         => $::hostname,
+    host                             => $::hostname,
     rgw_ip                           => $rgw_ip_address,
     rgw_port                         => '6780',
     swift_endpoint_port              => '8080',
-    rgw_keyring_path                 => '/etc/ceph/keyring.radosgw.gateway',
+#     rgw_keyring_path                 => '/etc/ceph/keyring.radosgw.gateway',
+    keyring_path                     => '/etc/ceph/keyring.radosgw.gateway',
     rgw_socket_path                  => '/tmp/radosgw.sock',
-    rgw_log_file                     => '/var/log/ceph/radosgw.log',
+#     rgw_log_file                        => '/var/log/ceph/radosgw.log',
+    log_file                         => '/var/log/ceph/radosgw.log',
     rgw_data                         => '/var/lib/ceph/radosgw',
     rgw_dns_name                     => "*.${::domain}",
     rgw_print_continue               => true,
@@ -89,7 +92,8 @@ if $use_ceph and $storage_hash['objects_ceph'] {
     rgw_keystone_token_cache_size    => '10',
     rgw_keystone_accepted_roles      => '_member_, Member, admin, swiftoperator',
     rgw_keystone_revocation_interval => '1000000',
-    rgw_nss_db_path                  => '/etc/ceph/nss',
+#     rgw_nss_db_path                  => '/etc/ceph/nss',
+    nss_db_path                      => '/etc/ceph/nss',
 
     #rgw Log settings
     use_syslog                       => hiera('use_syslog', true),
