@@ -19,26 +19,36 @@ Exec { path    => [ '/bin/', '/sbin/' , '/usr/bin/', '/usr/sbin/' ],
 }
 
 # DO NOT SPLIT ceph auth command lines! See http://tracker.ceph.com/issues/3279
+
+ceph::key {"client.${glance_user}":
+  cap_mon => "allow r",
+  cap_osd => "allow class-read object_prefix rbd_children, allow rwx pool=${glance_pool}"
+  user => "glance"
+}
+
 ceph::pool {$glance_pool:
-  user          => $glance_user,
-  acl           => "mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=${glance_pool}'",
-  keyring_owner => 'glance',
   pg_num        => $osd_pool_default_pg_num,
   pgp_num       => $osd_pool_default_pg_num,
+}
+
+ceph::key {"client.${cinder_user}":
+  cap_mon => "allow r",
+  cap_osd => "allow class-read object_prefix rbd_children, allow rwx pool=${cinder_pool}, allow rx pool=${glance_pool}"
+  user => "cinder"
 }
 
 ceph::pool {$cinder_pool:
-  user          => $cinder_user,
-  acl           => "mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=${cinder_pool}, allow rx pool=${glance_pool}'",
-  keyring_owner => 'cinder',
   pg_num        => $osd_pool_default_pg_num,
   pgp_num       => $osd_pool_default_pg_num,
 }
 
+ceph::key {"client.${cinder_backup_user}":
+  cap_mon => "allow r",
+  cap_osd => "allow class-read object_prefix rbd_children, allow rwx pool=${cinder_backup_pool}, allow rx pool=${cinder_pool}"
+  user => "cinder"
+}
+
 ceph::pool {$cinder_backup_pool:
-  user          => $cinder_backup_user,
-  acl           => "mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=${cinder_backup_pool}, allow rx pool=${cinder_pool}'",
-  keyring_owner => 'cinder',
   pg_num        => $osd_pool_default_pg_num,
   pgp_num       => $osd_pool_default_pg_num,
 }
