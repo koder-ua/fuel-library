@@ -37,18 +37,11 @@ $glance_pool              = 'images'
 $compute_user             = 'compute'
 $compute_pool             = 'compute'
 
-# ceph::key {
-  # user          => $compute_user,
-  # acl           => "mon 'allow r' osd 'allow class-read object_prefix rbd_children, allow rwx pool=${cinder_pool}, allow rx pool=${glance_pool}, allow rwx pool=${compute_pool}'",
-  # keyring_owner => 'nova',
-# }
-
 ceph::key {"client.${compute_user}":
   cap_mon => "allow r",
   cap_osd => "allow class-read object_prefix rbd_children, allow rwx pool=${cinder_pool}, allow rx pool=${glance_pool}, allow rwx pool=${compute_pool}"
   user => "nova"
-}
-
+} ->
 ceph::pool {$compute_pool:
   pg_num        => $storage_hash['pg_num'],
   pgp_num       => $storage_hash['pg_num'],

@@ -1,41 +1,21 @@
 notice('MODULAR: ceph/radosgw.pp')
 
-$storage_hash     = hiera('storage', {})
-$use_neutron      = hiera('use_neutron')
-$public_vip       = hiera('public_vip')
-$keystone_hash    = hiera('keystone', {})
-$management_vip   = hiera('management_vip')
-$service_endpoint = hiera('service_endpoint')
-$public_ssl_hash  = hiera('public_ssl')
 $mon_address_map  = get_node_to_ipaddr_map_by_network_role(hiera_hash('ceph_monitor_nodes'), 'ceph/public')
 
-if ($storage_hash['volumes_ceph'] or
-  $storage_hash['images_ceph'] or
-  $storage_hash['objects_ceph']
-) {
-  $use_ceph = true
-} else {
-  $use_ceph = false
-}
-
-if $use_ceph and $storage_hash['objects_ceph'] {
-
-  prepare_network_config(hiera_hash('network_scheme'))
-  $ceph_cluster_network = get_network_role_property('ceph/replication', 'network')
-  $ceph_public_network  = get_network_role_property('ceph/public', 'network')
-  $rgw_ip_address       = get_netwouserrk_role_property('ceph/radosgw', 'ipaddr')
-
+if hiera('storage', {})['objects_ceph'] {
   # Apache and listen ports
   class { 'osnailyfacter::apache':
     listen_ports => hiera_array('apache_ports', ['80', '8888']),
   }
+
   if ($::osfamily == 'Debian'){
     apache::mod {'rewrite': }
     apache::mod {'fastcgi': }
   }
-  include ::tweaks::apache_wrappers
-  include ceph::params
 
+  include ::tweaks::apache_wrappers
+
+  $service_endpoint = hiera('service_endpoint')
   $haproxy_stats_url = "http://${service_endpoint}:10000/;csv"
 
   haproxy_backend_status { 'keystone-admin' :
@@ -56,11 +36,6 @@ if $use_ceph and $storage_hash['objects_ceph'] {
   Haproxy_backend_status['keystone-public'] -> Class ['ceph::keystone']
 
   class { 'ceph::rgw':
-
-    # Ceph
-#     adm_ip                           => $management_vip,
-#     int_ip                           => $management_vip,
-
     # RadosGW settings
     rgw_port                         => '6780',
     swift_endpoint_port              => '8080',
@@ -72,20 +47,17 @@ if $use_ceph and $storage_hash['objects_ceph'] {
     rgw_print_continue               => true,
   }
  
-   #rgw Keystone settings
+  # rgw Keystone settings
+
+  $keystone_hash    = hiera('keystone', {})
+
   class { 'ceph::rgw::keystone':
     rgw_keystone_url                 => "${service_endpoint}:35357",
     rgw_keystone_admin_token         => $keystone_hash['admin_token'],
     rgw_keystone_token_cache_size    => '10',
     rgw_keystone_accepted_roles      => '_member_, Member, admin, swiftoperator',
     rgw_keystone_revocation_interval => '1000000',
- }
-
-    #rgw Log settings
-#     use_syslog                       => hiera('use_syslog', true),
-#     syslog_facility                  => hiera('syslog_log_facility_ceph', 'LOG_LOCAL0'),
-#     syslog_level                     => hiera('syslog_log_level_ceph', 'info'),
-  
+  }  
 
   Exec { path => [ '/bin/', '/sbin/' , '/usr/bin/', '/usr/sbin/' ],
     cwd  => '/root',
