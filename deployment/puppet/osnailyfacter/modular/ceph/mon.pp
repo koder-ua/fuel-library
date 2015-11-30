@@ -1,53 +1,49 @@
 notice('MODULAR: ceph/mon.pp')
 
-# if ($storage_hash['images_ceph']) {
-#   $glance_backend = 'ceph'
-# } elsif ($storage_hash['images_vcenter']) {
-#   $glance_backend = 'vmware'
-# } else {
-#   $glance_backend = 'swift'
-# }
+# FUEL ships it's own ceph packages
+# class { 'ceph::repo':}
 
-# if ($storage_hash['volumes_ceph'] or
-#   $storage_hash['images_ceph'] or
-#   $storage_hash['objects_ceph'] or
-#   $storage_hash['ephemeral_ceph']
-# ) {
-#   $use_ceph = true
-# } else {
-#   $use_ceph = false
-# }
-
-class { 'ceph::repo': }
-
-$storage_hash = hiera('storage', {})
 $mon_address_map = get_node_to_ipaddr_map_by_network_role(hiera_hash('ceph_monitor_nodes'), 'ceph/public')
-$admin_key = hiera('admin_key')
-$mon_key = hiera('mon_key')
-$bootstrap_osd_key = hiera('bootstrap_osd_key')
-$fsid = hiera('fsid')
-$osd_journal_size = hiera(osd_journal_size, "2048")
+
+$mon_ips = values($mon_address_map)
+$first_mon = mon_ips[0]
+$second_mon = mon_ips[1]
 
 prepare_network_config(hiera_hash('network_scheme'))
 $ceph_cluster_network    = get_network_role_property('ceph/replication', 'network')
 $ceph_public_network     = get_network_role_property('ceph/public', 'network')
 
+# this is required, as puppet-ceph manifests requires
+# all monitors to be deployed in parrallel, while
+# FUEL deploys primary monitor first
+# So primary monitor always deployed as a single
+# monitor. And that it config gets updated from secondary
+# monitor
+
+if $first_mon == $::hostname {
+  $mon_initial_members = values($mon_address_map)[0]
+  $mon_hosts = keys($mon_address_map)[0]
+} else {
+  $mon_initial_members = values($mon_address_map)
+  $mon_hosts = keys($mon_address_map)
+}
+
+# if this is second monitor
+if $second_mon == $::hostname and hiera('ceph_primary_monitor_node') != $::hostname {
+  # update monitor config on primary monitor and restart mon
+  # on primary mon node
+}
+
 class { 'ceph':
-  fsid                => $fsid,
-  osd_journal_size         => $osd_journal_size,
-  osd_pool_default_pg_num  => $storage_hash['pg_num'],
-  osd_pool_default_pgp_num => $storage_hash['pg_num'],
-  osd_pool_default_size    => $storage_hash['osd_pool_size'],
-  mon_initial_members      => values($mon_address_map),
-  mon_hosts                => keys($mon_address_map),
+  fsid                     => hiera('fsid')
+  mon_initial_members      => $mon_initial_members,
+  mon_hosts                => $mon_hosts,
   cluster_network          => $ceph_cluster_network,
   public_network           => $ceph_public_network,
-  mon_initial_members => 'mon1,mon2,mon3',
-  mon_host            => '<ip of mon1>,<ip of mon2>,<ip of mon3>',
 }
 
 ceph::mon { $::hostname:
-  key => $mon_key,
+  key => hiera('mon_key'),
 }
 
 Ceph::Key {
@@ -57,16 +53,18 @@ Ceph::Key {
 }
 
 ceph::key { 'client.admin':
-  secret  => $admin_key,
+  secret  => hiera('admin_key'),
   cap_mon => 'allow *',
   cap_osd => 'allow *',
   cap_mds => 'allow',
 }
 
 ceph::key { 'client.bootstrap-osd':
-  secret  => $bootstrap_osd_key,
+  secret  => hiera('bootstrap_osd_key'),
   cap_mon => 'allow profile bootstrap-osd',
 }
+
+$storage_hash = hiera('storage', {})
 
 if ($storage_hash['volumes_ceph']) {
   include ::cinder::params
