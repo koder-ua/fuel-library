@@ -1,6 +1,9 @@
 notice('MODULAR: ceph/radosgw.pp')
 
 $mon_address_map  = get_node_to_ipaddr_map_by_network_role(hiera_hash('ceph_monitor_nodes'), 'ceph/public')
+package{'ceph':
+ensure => installed
+}
 
 # Apache and listen ports
 class { 'osnailyfacter::apache':
@@ -13,7 +16,7 @@ if ($::osfamily == 'Debian'){
 }
 
 include ::tweaks::apache_wrappers
-
+include ::ceph::params
 $service_endpoint = hiera('service_endpoint')
 $haproxy_stats_url = "http://${service_endpoint}:10000/;csv"
 
@@ -31,32 +34,32 @@ haproxy_backend_status { 'keystone-public' :
   url   => $haproxy_stats_url,
 }
 
-# Haproxy_backend_status['keystone-admin']  -> Class ['ceph::keystone']
-# Haproxy_backend_status['keystone-public'] -> Class ['ceph::keystone']
+#Haproxy_backend_status['keystone-admin']  -> Class ['ceph::keystone']
+#Haproxy_backend_status['keystone-public'] -> Class ['ceph::keystone']
 
-ceph::rgw { 'rgw_set':
+ceph::rgw { 'rgw_conf':
   # RadosGW settings
   rgw_port                         => '6780',
   rgw_print_continue               => true,
   keyring_path                     => '/etc/ceph/keyring.radosgw.gateway',
   log_file                         => '/var/log/ceph/radosgw.log',
-  rgw_data                         => '/var/lib/ceph/radosgw',
+  rgw_data                         => '/var/lib/ceph/radosgw-test',
   rgw_dns_name                     => "*.${::domain}",
-  rgw_print_continue               => true,
 }
 
 # rgw Keystone settings
 
 $keystone_hash    = hiera('keystone', {})
-
 ceph::rgw::keystone {'rgw_key':
   rgw_keystone_url                 => "${service_endpoint}:35357",
   rgw_keystone_admin_token         => $keystone_hash['admin_token'],
   rgw_keystone_token_cache_size    => '10',
   rgw_keystone_accepted_roles      => '_member_, Member, admin, swiftoperator',
   rgw_keystone_revocation_interval => '1000000',
-}  
+}
 
 Exec { path => [ '/bin/', '/sbin/' , '/usr/bin/', '/usr/sbin/' ],
   cwd  => '/root',
 }
+
+ 
