@@ -31,13 +31,12 @@ haproxy_backend_status { 'keystone-public' :
   url   => $haproxy_stats_url,
 }
 
-Haproxy_backend_status['keystone-admin']  -> Class ['ceph::keystone']
-Haproxy_backend_status['keystone-public'] -> Class ['ceph::keystone']
+# Haproxy_backend_status['keystone-admin']  -> Class ['ceph::keystone']
+# Haproxy_backend_status['keystone-public'] -> Class ['ceph::keystone']
 
-class { 'ceph::rgw':
+ceph::rgw { 'rgw_set':
   # RadosGW settings
   rgw_port                         => '6780',
-  swift_endpoint_port              => '8080',
   rgw_print_continue               => true,
   keyring_path                     => '/etc/ceph/keyring.radosgw.gateway',
   log_file                         => '/var/log/ceph/radosgw.log',
@@ -50,7 +49,7 @@ class { 'ceph::rgw':
 
 $keystone_hash    = hiera('keystone', {})
 
-class { 'ceph::rgw::keystone':
+ceph::rgw::keystone {'rgw_key':
   rgw_keystone_url                 => "${service_endpoint}:35357",
   rgw_keystone_admin_token         => $keystone_hash['admin_token'],
   rgw_keystone_token_cache_size    => '10',
